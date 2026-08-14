@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ info.name if info else 'MiToken' }} · Panel on-chain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="grid-backdrop"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&#9670;</span>
+      <div>
+        <h1>{{ info.name if info else 'MiToken' }} <span class="ticker">{{ info.symbol if info else '' }}</span></h1>
+        {% if info %}
+        <a class="contract-link" href="https://sepolia.etherscan.io/address/{{ info.address }}" target="_blank" rel="noopener">
+          {{ info.address }} &#8599;
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="status">
+      {% if error %}
+        <span class="dot dot--off"></span> Sin conexión
+      {% else %}
+        <span class="dot dot--on"></span> Conectado · Sepolia · bloque {{ info.latest_block }}
+      {% endif %}
+    </div>
+  </header>
+
+  <main>
+    {% if error %}
+      <div class="panel panel--error">
+        <strong>No se pudo leer el contrato.</strong>
+        <p>{{ error }}</p>
+        <p class="hint">Revisa RPC_URL y CONTRACT_ADDRESS en tu archivo .env, y que tengas conexión a internet.</p>
+      </div>
+    {% else %}
+      <section class="stats">
+        <div class="stat-card">
+          <span class="stat-label">Supply total</span>
+          <span class="stat-value">{{ "{:,.0f}".format(info.total_supply) }}</span>
+          <span class="stat-unit">{{ info.symbol }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Balance del owner</span>
+          <span class="stat-value">{{ "{:,.0f}".format(info.owner_balance) }}</span>
+          <span class="stat-unit">{{ info.symbol }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Decimales</span>
+          <span class="stat-value">{{ info.decimals }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Owner</span>
+          <span class="stat-value stat-value--mono">{{ info.owner[:6] }}&hellip;{{ info.owner[-4:] }}</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Consultar balance</h2>
+        <form class="balance-form" method="get" action="/">
+          <input type="text" name="address" placeholder="0x..." value="{{ query_address or '' }}" autocomplete="off" spellcheck="false">
+          <button type="submit">Buscar</button>
+        </form>
+        {% if balance_result %}
+          {% if balance_result.error %}
+            <p class="form-error">{{ balance_result.error }}</p>
+          {% else %}
+            <p class="form-result">
+              <span class="mono">{{ balance_result.address }}</span> tiene
+              <strong>{{ "{:,.4f}".format(balance_result.balance) }} {{ info.symbol }}</strong>
+            </p>
+          {% endif %}
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Transfers recientes</h2>
+        {% if transfers %}
+          <div class="ledger">
+            {% for t in transfers %}
+              <div class="ledger-row">
+                <div class="ledger-bar"></div>
+                <div class="ledger-body">
+                  <div class="ledger-addresses">
+                    <span class="mono">{{ t.from[:6] }}&hellip;{{ t.from[-4:] }}</span>
+                    <span class="arrow">&rarr;</span>
+                    <span class="mono">{{ t.to[:6] }}&hellip;{{ t.to[-4:] }}</span>
+                  </div>
+                  <div class="ledger-meta">
+                    bloque {{ t.block }} ·
+                    <a class="mono" href="https://sepolia.etherscan.io/tx/{{ t.tx_hash }}" target="_blank" rel="noopener">{{ t.tx_hash[:10] }}&hellip;</a>
+                  </div>
+                </div>
+                <div class="ledger-value">{{ "{:,.2f}".format(t.value) }} {{ info.symbol }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty">Todavía no hay transfers registrados en el rango escaneado.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </main>
+
+  <footer>
+    <p>Portafolio · contrato ERC-20 en Sepolia testnet · desplegado desde Remix</p>
+  </footer>
+</body>
+</html>
