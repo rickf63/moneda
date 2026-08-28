@@ -11,6 +11,10 @@ load_dotenv()
 RPC_URL = os.getenv("RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 DEPLOY_BLOCK = int(os.getenv("DEPLOY_BLOCK", "0"))
+CHAIN_ID = int(os.getenv("CHAIN_ID", "11155111"))  # 11155111 = Sepolia, 1 = mainnet
+NETWORK_NAME = os.getenv("NETWORK_NAME", "Sepolia")
+EXPLORER_BASE_URL = os.getenv("EXPLORER_BASE_URL", "https://sepolia.etherscan.io").rstrip("/")
+TOKENSALE_ADDRESS = os.getenv("TOKENSALE_ADDRESS", "").strip()  # opcional
 LOG_SCAN_LIMIT = 5000  # rango máx. de bloques por request (límite típico de RPCs públicos)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,6 +37,30 @@ contract = w3.eth.contract(
     address=Web3.to_checksum_address(CONTRACT_ADDRESS),
     abi=CONTRACT_ABI,
 )
+
+TOKENSALE_ABI = None
+tokensale_contract = None
+if TOKENSALE_ADDRESS:
+    with open(BASE_DIR / "abi" / "TokenSale.json", encoding="utf-8") as f:
+        TOKENSALE_ABI = json.load(f)
+    tokensale_contract = w3.eth.contract(
+        address=Web3.to_checksum_address(TOKENSALE_ADDRESS),
+        abi=TOKENSALE_ABI,
+    )
+
+
+def get_sale_info():
+    """Lee la tasa de cambio y cuántos tokens quedan disponibles en la venta."""
+    if not tokensale_contract:
+        return None
+    tokens_per_eth = tokensale_contract.functions.tokensPerEth().call()
+    remaining_raw = contract.functions.balanceOf(TOKENSALE_ADDRESS).call()
+    decimals = contract.functions.decimals().call()
+    return {
+        "address": TOKENSALE_ADDRESS,
+        "tokens_per_eth": tokens_per_eth,
+        "remaining": remaining_raw / (10 ** decimals),
+    }
 
 
 def get_token_info():
@@ -100,6 +128,13 @@ def dashboard():
     except Exception as exc:
         error = str(exc)
 
+    sale_info = None
+    if info and tokensale_contract:
+        try:
+            sale_info = get_sale_info()
+        except Exception:
+            sale_info = None  # si falla la lectura, simplemente no se muestra la sección
+
     if info and query_address:
         try:
             balance_result = get_balance(query_address, info["decimals"])
@@ -113,8 +148,14 @@ def dashboard():
         balance_result=balance_result,
         query_address=query_address,
         error=error,
+        abi_json=CONTRACT_ABI,
+        chain_id_hex=hex(CHAIN_ID),
+        network_name=NETWORK_NAME,
+        explorer_base_url=EXPLORER_BASE_URL,
+        sale_info=sale_info,
+        tokensale_abi_json=TOKENSALE_ABI,
     )
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)
