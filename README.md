@@ -1,115 +1,124 @@
-# ERC-20 Token Dashboard
+# moneda — MiToken (MTK) + TokenSale + Dashboard
 
-A full-stack Web3 project: a custom ERC-20 token written in Solidity, deployed to the Ethereum Sepolia testnet, paired with a live on-chain dashboard built with Flask + web3.py.
+Proyecto Web3 full-stack de portafolio: un token **ERC-20** (`MiToken` / `MTK`), un contrato de **venta a tasa fija** (`TokenSale`) y un **panel web en Flask + web3.py** que lee los contratos en vivo y permite conectar MetaMask para enviar y comprar tokens.
 
-![Dashboard screenshot](docs/dashboard-screenshot.png)
+Empezó en la testnet **Sepolia** y ahora está desplegado en **Ethereum mainnet**.
 
-## What this project demonstrates
+## Contratos en Ethereum mainnet
 
-- Writing and deploying a Solidity smart contract (ERC-20 standard, via OpenZeppelin)
-- Reading live on-chain data with `web3.py` — no database involved, every number on the dashboard is a fresh call to the blockchain
-- A Flask backend serving a server-rendered dashboard
-- End-to-end Web3 tooling: MetaMask, testnet faucets, Remix IDE, Etherscan
+| Contrato | Dirección | Etherscan |
+|---|---|---|
+| **MiToken (MTK)** — ERC-20, 18 decimales, supply inicial 1,000,000 | `0xfE32dA5475A56091344dD43Ab074Ca033F5A8EDD` | [ver](https://etherscan.io/token/0xfE32dA5475A56091344dD43Ab074Ca033F5A8EDD) |
+| **TokenSale** — 100,000 MTK por 1 ETH | `0x5B9Fc968C5A023C0093e8Da5B6C57f59e3311587` | [ver código verificado](https://etherscan.io/address/0x5B9Fc968C5A023C0093e8Da5B6C57f59e3311587#code) |
 
-## Live deployment
+El código de `TokenSale` está verificado en Etherscan, Sourcify y Blockscout.
 
-| | |
-|---|---|
-| Network | Ethereum Sepolia (testnet) |
-| Token | MiToken (`MTK`) |
-| Contract address | [`0xfE32dA5475A56091344dD43Ab074Ca033F5A8EDD`](https://sepolia.etherscan.io/address/0xfE32dA5475A56091344dD43Ab074Ca033F5A8EDD) |
-| Deployed via | [Remix IDE](https://remix.ethereum.org) |
+### Cómo funciona la venta
 
-> This runs on a public testnet. The token has no real-world monetary value — the project exists to demonstrate the full contract → dashboard pipeline end to end.
+- La tasa es fija: **1 ETH = 100,000 MTK** (0.001 ETH = 100 MTK). Está definida como `immutable` en el constructor y no se puede cambiar.
+- Para comprar basta con mandar ETH a la dirección del `TokenSale` (la función `receive()` llama a `buyTokens()`), o usar la sección "Comprar tokens" del dashboard.
+- El contrato transfiere los MTK al comprador en la misma transacción. Si no hay suficientes tokens en venta, la transacción se revierte.
+- El owner puede retirar el ETH recaudado (`withdraw()`) y recuperar los tokens no vendidos (`withdrawUnsoldTokens()`).
 
-## Architecture
+## Aviso importante
 
-```
-MiToken.sol  ──deploy──>  Sepolia testnet
-                                │
-                                │  eth_call / eth_getLogs
-                                ▼
-                        web3.py (Flask backend)
-                                │
-                                ▼
-                    Server-rendered dashboard (Jinja2)
-```
+Este es un **proyecto de portafolio/aprendizaje**.
 
-## Features
+- Los contratos **no están auditados**.
+- `MTK` no tiene valor garantizado ni respaldo; su "precio" es solo la tasa fija definida en el `TokenSale`.
+- El owner de `MiToken` puede emitir más tokens con `mint()`, así que el supply no es fijo.
+- Nada de esto es una oferta de inversión. Antes de usarlo con fondos de terceros se necesitaría una auditoría de seguridad y asesoría legal.
 
-- Live token stats: name, symbol, total supply, decimals
-- Owner address and owner balance
-- Balance lookup for any wallet address
-- Recent `Transfer` events, read directly from contract logs
-- `mint()` (owner-only) and `burn()` built into the contract
+## Stack
 
-## Tech stack
+- **Contratos:** Solidity 0.8.34, OpenZeppelin (ERC20, Ownable, ReentrancyGuard), desplegados desde Remix
+- **Backend:** Python, Flask, web3.py (solo lectura, sin llaves privadas)
+- **Frontend:** HTML/CSS, ethers.js + MetaMask (cada usuario firma desde su propio navegador)
 
-- **Smart contract:** Solidity ^0.8.20, OpenZeppelin (`ERC20`, `Ownable`)
-- **Backend:** Python, Flask, web3.py
-- **Frontend:** Jinja2 templates, vanilla CSS
-- **Tooling:** Remix IDE, MetaMask, Sepolia testnet
+## Dashboard
 
-## Project structure
+![Dashboard](docs/dashboard-screenshot.png)
 
-```
-erc20-token-dashboard/
-├── contract/
-│   └── MiToken.sol         # ERC-20 token contract
-├── abi/
-│   └── MiToken.json        # Contract ABI used by the backend
-├── app.py                  # Flask app + web3.py logic
-├── templates/
-│   └── index.html
-├── static/
-│   └── style.css
-├── requirements.txt
-├── .env.example
-└── docs/
-    └── dashboard-screenshot.png
-```
+Muestra:
+- Nombre, símbolo, supply total y decimales del token
+- Owner del contrato y su balance
+- Buscador de balance por dirección
+- Últimos transfers on-chain, leídos directo de los logs del contrato (sin base de datos intermedia)
+- **Conectar Wallet**: cualquier usuario con MetaMask puede conectar su wallet, ver su balance y enviar tokens, firmando desde su propio navegador. El backend nunca ve ni maneja llaves privadas.
+- **Comprar tokens** (opcional): si configuras `TOKENSALE_ADDRESS`, aparece una sección para comprar MTK mandando ETH desde la wallet conectada, con un estimador en vivo ETH → MTK.
 
-## Running it locally
+### Requisitos
+
+- Python 3.10+
+
+### Instalación
 
 ```bash
-# 1. Clone
-git clone https://github.com/<your-username>/erc20-token-dashboard.git
-cd erc20-token-dashboard
-
-# 2. Virtual environment
+# 1. Crear entorno virtual
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # macOS/Linux
 
-# 3. Install dependencies
+# 2. Activarlo
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# 3. Instalar dependencias
 pip install -r requirements.txt
+```
 
-# 4. Configure environment
-copy .env.example .env     # Windows
-cp .env.example .env       # macOS/Linux
+### Configuración
 
-# 5. Run
+```bash
+# Windows
+copy .env.example .env
+# Mac/Linux
+cp .env.example .env
+```
+
+En `.env` se define la red y las direcciones de los contratos (`RPC_URL`, `CONTRACT_ADDRESS`, `TOKENSALE_ADDRESS`, `CHAIN_ID`, `NETWORK_NAME`, `EXPLORER_BASE_URL`). El código no está atado a ninguna red: cambiando esos valores funciona en Sepolia o en mainnet.
+
+### Correrlo
+
+```bash
 python app.py
 ```
 
-Then open `http://127.0.0.1:5000`.
+Abre `http://127.0.0.1:5000` en tu navegador.
 
-The dashboard is **read-only** — it never handles or requests a private key.
+## Estructura
 
-## Contract overview
+```
+moneda/
+├── contract/
+│   ├── MiToken.sol       # Token ERC-20
+│   └── TokenSale.sol     # Venta de MTK a tasa fija
+├── abi/
+│   ├── MiToken.json
+│   └── TokenSale.json
+├── app.py                # Backend Flask + web3.py
+├── templates/index.html
+├── static/
+│   ├── style.css
+│   └── wallet.js         # Conectar wallet, enviar y comprar (ethers.js)
+├── docs/dashboard-screenshot.png
+├── requirements.txt
+├── .env.example
+└── .gitignore
+```
 
-`MiToken.sol` extends OpenZeppelin's `ERC20` and `Ownable`:
+## Notas de seguridad
 
-- Standard ERC-20 interface (`transfer`, `approve`, `transferFrom`, `balanceOf`, ...)
-- `mint(address, uint256)` — owner-only, for issuing additional supply
-- `burn(uint256)` — any holder can burn their own tokens
+- El backend Flask es **solo de lectura**: no pide ni maneja llaves privadas.
+- "Conectar Wallet" corre 100% en el navegador del usuario (JavaScript + MetaMask). Cada quien firma sus propias transacciones.
+- El `.env` está en `.gitignore` a propósito.
 
-## Possible next steps
+## Próximos pasos posibles
 
-- Transfer/mint/burn actions from the dashboard UI (signed with a dedicated testnet-only wallet)
-- Supply / transfer history chart over time
-- Deploy the dashboard to a small home server
+- Funciones de mint/burn desde la interfaz de wallet-connect
+- Gráfica de supply o de transfers en el tiempo
+- Desplegar el dashboard en un servidor propio (Raspberry Pi / ThinkCentre)
 
-## License
+## Licencia
 
-MIT — see [LICENSE](LICENSE).
+MIT — ver [LICENSE](LICENSE).

@@ -275,6 +275,58 @@ main {
 
 .empty { color: var(--muted); font-size: 14px; }
 
+.wallet-intro {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+  max-width: 560px;
+}
+
+#connect-btn {
+  background: var(--teal);
+  color: #062421;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+#connect-btn:hover { filter: brightness(1.08); }
+#connect-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.wallet-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.wallet-info p { margin: 4px 0 0; }
+.wallet-info .mono { font-size: 15px; }
+
+.buy-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.buy-section h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.buy-estimate {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--amber);
+  align-self: center;
+  white-space: nowrap;
+}
+
 footer {
   text-align: center;
   padding: 24px;

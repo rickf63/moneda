@@ -17,7 +17,7 @@
       <div>
         <h1>{{ info.name if info else 'MiToken' }} <span class="ticker">{{ info.symbol if info else '' }}</span></h1>
         {% if info %}
-        <a class="contract-link" href="https://sepolia.etherscan.io/address/{{ info.address }}" target="_blank" rel="noopener">
+        <a class="contract-link" href="{{ explorer_base_url }}/address/{{ info.address }}" target="_blank" rel="noopener">
           {{ info.address }} &#8599;
         </a>
         {% endif %}
@@ -27,7 +27,7 @@
       {% if error %}
         <span class="dot dot--off"></span> Sin conexión
       {% else %}
-        <span class="dot dot--on"></span> Conectado · Sepolia · bloque {{ info.latest_block }}
+        <span class="dot dot--on"></span> Conectado · {{ network_name }} · bloque {{ info.latest_block }}
       {% endif %}
     </div>
   </header>
@@ -79,6 +79,50 @@
         {% endif %}
       </section>
 
+      <section class="panel" id="wallet-section">
+        <h2>Tu wallet</h2>
+        <p class="wallet-intro">Conecta tu MetaMask para ver tu balance y enviar tokens — tú firmas todo desde tu propia wallet, este dashboard nunca ve ni toca tu llave privada.</p>
+        <button id="connect-btn" type="button">Conectar Wallet</button>
+
+        <div id="network-warning" class="form-error" style="display:none;"></div>
+
+        <div id="wallet-panel" style="display:none;">
+          <div class="wallet-info">
+            <div>
+              <span class="stat-label">Tu dirección</span>
+              <p class="mono" id="wallet-address">—</p>
+            </div>
+            <div>
+              <span class="stat-label">Tu balance</span>
+              <p class="stat-value" id="wallet-balance">—</p>
+            </div>
+          </div>
+
+          <form id="transfer-form" class="balance-form">
+            <input type="text" id="transfer-to" placeholder="Dirección destino (0x...)" autocomplete="off" spellcheck="false">
+            <input type="text" id="transfer-amount" placeholder="Cantidad" autocomplete="off" spellcheck="false" style="max-width:140px;">
+            <button type="submit">Enviar</button>
+          </form>
+          <p id="transfer-status" class="form-result"></p>
+
+          {% if sale_info %}
+          <div class="buy-section">
+            <h3>Comprar tokens</h3>
+            <p class="wallet-intro">
+              Tasa actual: <strong>{{ sale_info.tokens_per_eth }} {{ info.symbol }} por 1 ETH</strong>
+              · Quedan {{ "{:,.0f}".format(sale_info.remaining) }} {{ info.symbol }} disponibles en la venta.
+            </p>
+            <form id="buy-form" class="balance-form">
+              <input type="text" id="buy-eth-amount" placeholder="Cantidad en ETH" autocomplete="off" spellcheck="false" style="max-width:160px;">
+              <span id="buy-estimate" class="buy-estimate"></span>
+              <button type="submit">Comprar</button>
+            </form>
+            <p id="buy-status" class="form-result"></p>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
       <section class="panel">
         <h2>Transfers recientes</h2>
         {% if transfers %}
@@ -94,7 +138,7 @@
                   </div>
                   <div class="ledger-meta">
                     bloque {{ t.block }} ·
-                    <a class="mono" href="https://sepolia.etherscan.io/tx/{{ t.tx_hash }}" target="_blank" rel="noopener">{{ t.tx_hash[:10] }}&hellip;</a>
+                    <a class="mono" href="{{ explorer_base_url }}/tx/{{ t.tx_hash }}" target="_blank" rel="noopener">{{ t.tx_hash[:10] }}&hellip;</a>
                   </div>
                 </div>
                 <div class="ledger-value">{{ "{:,.2f}".format(t.value) }} {{ info.symbol }}</div>
@@ -109,7 +153,26 @@
   </main>
 
   <footer>
-    <p>Portafolio · contrato ERC-20 en Sepolia testnet · desplegado desde Remix</p>
+    <p>Portafolio · contrato ERC-20 en {{ network_name }} · desplegado desde Remix</p>
   </footer>
+
+  {% if info %}
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script>
+    window.APP_CONFIG = {
+      contractAddress: {{ info.address | tojson }},
+      abi: {{ abi_json | tojson }},
+      expectedChainIdHex: {{ chain_id_hex | tojson }},
+      networkName: {{ network_name | tojson }},
+      symbol: {{ info.symbol | tojson }},
+      sale: {% if sale_info %}{
+        address: {{ sale_info.address | tojson }},
+        abi: {{ tokensale_abi_json | tojson }},
+        tokensPerEth: {{ sale_info.tokens_per_eth | tojson }},
+      }{% else %}null{% endif %},
+    };
+  </script>
+  <script src="{{ url_for('static', filename='wallet.js') }}"></script>
+  {% endif %}
 </body>
 </html>
