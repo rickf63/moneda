@@ -109,7 +109,7 @@
           <div class="buy-section">
             <h3>Comprar tokens</h3>
             <p class="wallet-intro">
-              Tasa actual: <strong>{{ sale_info.tokens_per_eth }} {{ info.symbol }} por 1 ETH</strong>
+              Tasa actual: <strong>{{ "{:,}".format(sale_info.tokens_per_eth) }} {{ info.symbol }} por 1 ETH</strong>
               · Quedan {{ "{:,.0f}".format(sale_info.remaining) }} {{ info.symbol }} disponibles en la venta.
             </p>
             <form id="buy-form" class="balance-form">

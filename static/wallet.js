@@ -22,6 +22,38 @@ function shortAddress(addr) {
   return addr.slice(0, 6) + "\u2026" + addr.slice(-4);
 }
 
+// Formato fijo con coma de miles (799,999) para que no se confunda con decimales,
+// sin importar el idioma del navegador.
+function formatNumber(value, maxDecimals = 4) {
+  return Number(value).toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+}
+
+// Si MetaMask est\u00e1 en otra red, le pide cambiar a la red del dashboard.
+// Devuelve true si ya estamos en la red correcta.
+async function ensureCorrectNetwork() {
+  const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+  if (chainIdHex.toLowerCase() === APP.expectedChainIdHex.toLowerCase()) {
+    networkWarningEl.style.display = "none";
+    return true;
+  }
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: APP.expectedChainIdHex }],
+    });
+    // Al cambiar de red se dispara "chainChanged" y la p\u00e1gina se recarga sola.
+    return false;
+  } catch (err) {
+    console.error(err);
+    networkWarningEl.style.display = "block";
+    networkWarningEl.textContent =
+      "Tu MetaMask est\u00e1 en otra red. Cambia a " + APP.networkName + " para que esto funcione.";
+    walletBalanceEl.textContent = "\u2014";
+    return false;
+  }
+}
+
 async function connectWallet() {
   if (typeof window.ethereum === "undefined") {
     transferStatusEl.textContent = "No se detectó MetaMask. Instálalo desde metamask.io";
@@ -53,20 +85,13 @@ async function refreshWalletInfo() {
   walletAddressEl.textContent = shortAddress(userAddress);
   walletAddressEl.title = userAddress;
 
-  const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
-  if (chainIdHex.toLowerCase() !== APP.expectedChainIdHex.toLowerCase()) {
-    networkWarningEl.style.display = "block";
-    networkWarningEl.textContent =
-      "Tu MetaMask está en otra red. Cambia a " + APP.networkName + " para que esto funcione.";
-    walletBalanceEl.textContent = "—";
-    return;
-  }
-  networkWarningEl.style.display = "none";
+  const onRightNetwork = await ensureCorrectNetwork();
+  if (!onRightNetwork) return;
 
   const decimals = await contract.decimals();
   const rawBalance = await contract.balanceOf(userAddress);
   const balance = ethers.formatUnits(rawBalance, decimals);
-  walletBalanceEl.textContent = Number(balance).toLocaleString() + " " + APP.symbol;
+  walletBalanceEl.textContent = formatNumber(balance) + " " + APP.symbol;
 }
 
 async function handleTransfer(event) {
@@ -111,7 +136,7 @@ function updateBuyEstimate() {
     return;
   }
   const estimatedTokens = eth * APP.sale.tokensPerEth;
-  buyEstimateEl.textContent = `≈ ${estimatedTokens.toLocaleString()} ${APP.symbol}`;
+  buyEstimateEl.textContent = `≈ ${formatNumber(estimatedTokens)} ${APP.symbol}`;
 }
 
 async function handleBuy(event) {
@@ -155,4 +180,13 @@ if (buyForm) {
 if (typeof window.ethereum !== "undefined") {
   window.ethereum.on("accountsChanged", () => window.location.reload());
   window.ethereum.on("chainChanged", () => window.location.reload());
+
+  // Si el usuario ya había autorizado este sitio, reconectar solo al cargar la página
+  // (por ejemplo, después de cambiar de red). No abre ninguna ventana de MetaMask.
+  window.ethereum
+    .request({ method: "eth_accounts" })
+    .then((accounts) => {
+      if (accounts && accounts.length > 0) connectWallet();
+    })
+    .catch(() => {});
 }

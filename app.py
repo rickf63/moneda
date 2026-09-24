@@ -16,6 +16,9 @@ NETWORK_NAME = os.getenv("NETWORK_NAME", "Sepolia")
 EXPLORER_BASE_URL = os.getenv("EXPLORER_BASE_URL", "https://sepolia.etherscan.io").rstrip("/")
 TOKENSALE_ADDRESS = os.getenv("TOKENSALE_ADDRESS", "").strip()  # opcional
 LOG_SCAN_LIMIT = 5000  # rango máx. de bloques por request (límite típico de RPCs públicos)
+# Cuántos tramos de LOG_SCAN_LIMIT bloques se revisan hacia atrás como máximo por carga de página.
+# 40 tramos x 5000 bloques = 200,000 bloques (~28 días en mainnet, ~12 s por bloque).
+MAX_SCAN_CHUNKS = int(os.getenv("MAX_SCAN_CHUNKS", "40"))
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -83,14 +86,26 @@ def get_token_info():
 
 
 def get_recent_transfers(decimals, limit=15):
-    """Escanea los logs del evento Transfer desde el bloque de despliegue."""
-    latest_block = w3.eth.block_number
-    start_block = max(DEPLOY_BLOCK, latest_block - LOG_SCAN_LIMIT)
+    """Busca los transfers más recientes, revisando hacia atrás en tramos.
 
-    logs = contract.events.Transfer().get_logs(
-        from_block=start_block,
-        to_block=latest_block,
-    )
+    Los RPC públicos limitan el rango de bloques por consulta, así que se pide de
+    LOG_SCAN_LIMIT en LOG_SCAN_LIMIT bloques, del más nuevo al más viejo, hasta juntar
+    `limit` transfers, llegar a DEPLOY_BLOCK o agotar MAX_SCAN_CHUNKS.
+    """
+    latest_block = w3.eth.block_number
+    to_block = latest_block
+    logs = []
+
+    for _ in range(MAX_SCAN_CHUNKS):
+        if to_block < DEPLOY_BLOCK or len(logs) >= limit:
+            break
+        from_block = max(DEPLOY_BLOCK, to_block - LOG_SCAN_LIMIT + 1)
+        chunk = contract.events.Transfer().get_logs(
+            from_block=from_block,
+            to_block=to_block,
+        )
+        logs = list(chunk) + logs  # mantener orden cronológico
+        to_block = from_block - 1
 
     transfers = []
     for log in reversed(logs[-limit:]):
