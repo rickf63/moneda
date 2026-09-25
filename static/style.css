@@ -343,3 +343,11 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   .dot--on { animation: none; }
 }
+
+/* Links dentro de textos de aviso (ej. "el explorador"): legibles sobre fondo oscuro */
+.empty a,
+.form-result a,
+.wallet-intro a {
+  color: var(--teal);
+  text-decoration: underline;
+}

@@ -4,6 +4,7 @@ import time
 import threading
 from pathlib import Path
 
+import requests
 from flask import Flask, render_template, request
 from web3 import Web3
 from dotenv import load_dotenv
@@ -17,6 +18,10 @@ CHAIN_ID = int(os.getenv("CHAIN_ID", "11155111"))  # 11155111 = Sepolia, 1 = mai
 NETWORK_NAME = os.getenv("NETWORK_NAME", "Sepolia")
 EXPLORER_BASE_URL = os.getenv("EXPLORER_BASE_URL", "https://sepolia.etherscan.io").rstrip("/")
 TOKENSALE_ADDRESS = os.getenv("TOKENSALE_ADDRESS", "").strip()  # opcional
+# Opcional pero recomendado: API key gratis de Etherscan (etherscan.io/myapikey).
+# Con ella los transfers se leen en UNA consulta, sin depender de los límites de eth_getLogs del RPC.
+ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY", "").strip()
+ETHERSCAN_API_URL = "https://api.etherscan.io/v2/api"
 # Rango máx. de bloques por consulta de logs. Cada RPC tiene su propio límite; si una
 # consulta falla, el rango se parte a la mitad automáticamente (ver get_recent_transfers).
 LOG_SCAN_LIMIT = int(os.getenv("LOG_SCAN_LIMIT", "5000"))
@@ -101,7 +106,52 @@ def get_token_info():
     }
 
 
+def get_transfers_etherscan(decimals, limit=15):
+    """Últimos transfers del token vía la API de Etherscan (una sola consulta)."""
+    resp = requests.get(
+        ETHERSCAN_API_URL,
+        params={
+            "chainid": CHAIN_ID,
+            "module": "account",
+            "action": "tokentx",
+            "contractaddress": CONTRACT_ADDRESS,
+            "page": 1,
+            "offset": limit,
+            "sort": "desc",
+            "apikey": ETHERSCAN_API_KEY,
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") != "1":
+        if "no transactions found" in str(data.get("message", "")).lower():
+            return []
+        raise RuntimeError(f"Etherscan: {data.get('message')} - {str(data.get('result'))[:200]}")
+
+    return [
+        {
+            "from": Web3.to_checksum_address(tx["from"]),
+            "to": Web3.to_checksum_address(tx["to"]),
+            "value": int(tx["value"]) / (10 ** decimals),
+            "block": int(tx["blockNumber"]),
+            "tx_hash": tx["hash"],
+        }
+        for tx in data["result"][:limit]
+    ]
+
+
 def get_recent_transfers(decimals, limit=15):
+    """Últimos transfers: Etherscan si hay API key; si no (o si falla), logs del RPC."""
+    if ETHERSCAN_API_KEY:
+        try:
+            return get_transfers_etherscan(decimals, limit)
+        except Exception as exc:
+            app.logger.warning("Etherscan falló, usando logs del RPC: %s", describe_error(exc))
+    return get_transfers_from_logs(decimals, limit)
+
+
+def get_transfers_from_logs(decimals, limit=15):
     """Busca los transfers más recientes, revisando hacia atrás en tramos.
 
     Los RPC limitan el rango de bloques por consulta, así que se pide por tramos del
