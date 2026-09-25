@@ -78,6 +78,26 @@
         {% endif %}
       </section>
 
+      {% if sale_info and eth_usd %}
+      <section class="panel" id="usd-calculator">
+        <h2>Calculadora en dólares</h2>
+        <p class="wallet-intro">
+          Precio del ETH: <strong>${{ "{:,.2f}".format(eth_usd) }} USD</strong>
+          · 1 {{ info.symbol }} ≈ <strong>${{ "{:,.4f}".format(eth_usd / sale_info.tokens_per_eth) }} USD</strong>
+          (a la tasa de la venta)
+        </p>
+        <form id="usd-form" class="balance-form">
+          <input type="text" id="usd-amount" placeholder="Dólares (ej. 10)" inputmode="decimal" autocomplete="off" spellcheck="false" style="max-width:180px;">
+          <span id="usd-result" class="buy-estimate"></span>
+        </form>
+        <div id="usd-actions" class="balance-form" style="display:none; margin-top:12px;">
+          <button type="button" id="usd-use-send">Usar para enviar</button>
+          <button type="button" id="usd-use-buy">Usar para comprar</button>
+        </div>
+        <p class="wallet-intro" style="margin-top:10px;">El precio del ETH cambia; la cuenta se hace con el precio de hace unos segundos.</p>
+      </section>
+      {% endif %}
+
       <section class="panel" id="wallet-section">
         <h2>Tu wallet</h2>
         <p class="wallet-intro">Conecta tu MetaMask para ver tu balance y enviar tokens — tú firmas todo desde tu propia wallet, este dashboard nunca ve ni toca tu llave privada.</p>
@@ -171,6 +191,7 @@
         abi: {{ tokensale_abi_json | tojson }},
         tokensPerEth: {{ sale_info.tokens_per_eth | tojson }},
       }{% else %}null{% endif %},
+      ethUsd: {{ eth_usd | tojson }},
     };
   </script>
   <script src="{{ url_for('static', filename='wallet.js') }}"></script>

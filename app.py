@@ -193,6 +193,46 @@ def get_transfers_from_logs(decimals, limit=15):
     return transfers
 
 
+# Precio ETH/USD para la calculadora. En mainnet se lee del oráculo de Chainlink
+# (on-chain, sin API key); si no está disponible, de la API de Etherscan.
+CHAINLINK_ETH_USD = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"  # feed ETH/USD, Ethereum mainnet
+CHAINLINK_ABI = [
+    {"inputs": [], "name": "decimals", "outputs": [{"type": "uint8"}], "stateMutability": "view", "type": "function"},
+    {"inputs": [], "name": "latestRoundData", "outputs": [
+        {"name": "roundId", "type": "uint80"}, {"name": "answer", "type": "int256"},
+        {"name": "startedAt", "type": "uint256"}, {"name": "updatedAt", "type": "uint256"},
+        {"name": "answeredInRound", "type": "uint80"}], "stateMutability": "view", "type": "function"},
+]
+PRICE_MAX_AGE_SECONDS = 3 * 60 * 60  # el feed se actualiza al menos cada hora
+
+
+def get_eth_usd():
+    """Precio de 1 ETH en dólares, o None si no se pudo obtener."""
+    if CHAIN_ID == 1:
+        try:
+            feed = w3.eth.contract(address=Web3.to_checksum_address(CHAINLINK_ETH_USD), abi=CHAINLINK_ABI)
+            _, answer, _, updated_at, _ = feed.functions.latestRoundData().call()
+            if answer > 0 and time.time() - updated_at < PRICE_MAX_AGE_SECONDS:
+                return answer / (10 ** feed.functions.decimals().call())
+        except Exception as exc:
+            app.logger.warning("No se pudo leer el precio de Chainlink: %s", describe_error(exc))
+
+    if ETHERSCAN_API_KEY:
+        try:
+            resp = requests.get(
+                ETHERSCAN_API_URL,
+                params={"chainid": 1, "module": "stats", "action": "ethprice", "apikey": ETHERSCAN_API_KEY},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("status") == "1":
+                return float(data["result"]["ethusd"])
+        except Exception as exc:
+            app.logger.warning("No se pudo leer el precio de Etherscan: %s", describe_error(exc))
+    return None
+
+
 def get_balance(address, decimals):
     """Consulta el balance de una dirección arbitraria."""
     checksum = Web3.to_checksum_address(address)
@@ -230,7 +270,9 @@ def get_chain_data():
             except Exception as exc:
                 app.logger.warning("No se pudo leer el TokenSale: %s", describe_error(exc))
 
-        _cache["data"] = (info, transfers, sale_info)
+        eth_usd = get_eth_usd()
+
+        _cache["data"] = (info, transfers, sale_info, eth_usd)
         _cache["at"] = time.time()
         return _cache["data"]
 
@@ -250,11 +292,12 @@ def dashboard():
     info = None
     transfers = []
     sale_info = None
+    eth_usd = None
     balance_result = None
     query_address = request.args.get("address", "").strip()
 
     try:
-        info, transfers, sale_info = get_chain_data()
+        info, transfers, sale_info, eth_usd = get_chain_data()
     except Exception as exc:
         # El detalle va al log del servidor; al visitante no se le muestran datos internos
         app.logger.error("Error leyendo la blockchain: %s", describe_error(exc))
@@ -278,6 +321,7 @@ def dashboard():
         network_name=NETWORK_NAME,
         explorer_base_url=EXPLORER_BASE_URL,
         sale_info=sale_info,
+        eth_usd=eth_usd,
         tokensale_abi_json=TOKENSALE_ABI,
     )
 

@@ -136,7 +136,9 @@ function updateBuyEstimate() {
     return;
   }
   const estimatedTokens = eth * APP.sale.tokensPerEth;
-  buyEstimateEl.textContent = `≈ ${formatNumber(estimatedTokens)} ${APP.symbol}`;
+  let text = `≈ ${formatNumber(estimatedTokens)} ${APP.symbol}`;
+  if (APP.ethUsd) text += ` (≈ $${formatNumber(eth * APP.ethUsd, 2)} USD)`;
+  buyEstimateEl.textContent = text;
 }
 
 async function handleBuy(event) {
@@ -171,6 +173,50 @@ async function handleBuy(event) {
 
 connectBtn.addEventListener("click", connectWallet);
 transferForm.addEventListener("submit", handleTransfer);
+
+// ---------- Calculadora en dólares (funciona sin conectar wallet) ----------
+const usdAmountEl = document.getElementById("usd-amount");
+const usdResultEl = document.getElementById("usd-result");
+const usdActionsEl = document.getElementById("usd-actions");
+let usdCalc = null; // { mtk, eth }
+
+function updateUsdCalc() {
+  const usd = Number(usdAmountEl.value.replace(",", "."));
+  if (!usd || usd <= 0 || !APP.ethUsd || !APP.sale) {
+    usdResultEl.textContent = "";
+    usdActionsEl.style.display = "none";
+    usdCalc = null;
+    return;
+  }
+  const eth = usd / APP.ethUsd;
+  const mtk = eth * APP.sale.tokensPerEth;
+  usdCalc = { mtk: Math.round(mtk), eth: Number(eth.toFixed(6)) };
+  usdResultEl.textContent =
+    `≈ ${formatNumber(usdCalc.mtk, 0)} ${APP.symbol}  ·  ${usdCalc.eth} ETH`;
+  usdActionsEl.style.display = "flex";
+}
+
+function useUsdCalc(target) {
+  if (!usdCalc) return;
+  const walletSection = document.getElementById("wallet-section");
+  if (target === "send") {
+    document.getElementById("transfer-amount").value = String(usdCalc.mtk);
+  } else if (buyEthAmountEl) {
+    buyEthAmountEl.value = String(usdCalc.eth);
+    updateBuyEstimate();
+  }
+  if (walletPanel.style.display === "none") {
+    transferStatusEl.textContent = "Conecta tu wallet para continuar; la cantidad ya quedó puesta.";
+  }
+  walletSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+if (usdAmountEl) {
+  usdAmountEl.addEventListener("input", updateUsdCalc);
+  document.getElementById("usd-form").addEventListener("submit", (e) => e.preventDefault());
+  document.getElementById("usd-use-send").addEventListener("click", () => useUsdCalc("send"));
+  document.getElementById("usd-use-buy").addEventListener("click", () => useUsdCalc("buy"));
+}
 
 if (buyForm) {
   buyForm.addEventListener("submit", handleBuy);
