@@ -37,8 +37,7 @@
       <div class="panel panel--error">
         <strong>No se pudo leer el contrato.</strong>
         <p>{{ error }}</p>
-        <p class="hint">Revisa RPC_URL y CONTRACT_ADDRESS en tu archivo .env, y que tengas conexión a internet.</p>
-      </div>
+              </div>
     {% else %}
       <section class="stats">
         <div class="stat-card">
@@ -145,6 +144,8 @@
               </div>
             {% endfor %}
           </div>
+        {% elif transfers is none %}
+          <p class="empty">No se pudieron cargar los transfers en este momento. Puedes verlos en <a href="{{ explorer_base_url }}/token/{{ info.address }}" target="_blank" rel="noopener">el explorador</a>.</p>
         {% else %}
           <p class="empty">Todavía no hay transfers registrados en el rango escaneado.</p>
         {% endif %}
@@ -157,7 +158,7 @@
   </footer>
 
   {% if info %}
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='vendor/ethers-6.13.4.umd.min.js') }}"></script>
   <script>
     window.APP_CONFIG = {
       contractAddress: {{ info.address | tojson }},

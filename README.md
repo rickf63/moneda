@@ -78,13 +78,27 @@ cp .env.example .env
 
 En `.env` se define la red y las direcciones de los contratos (`RPC_URL`, `CONTRACT_ADDRESS`, `TOKENSALE_ADDRESS`, `CHAIN_ID`, `NETWORK_NAME`, `EXPLORER_BASE_URL`). El código no está atado a ninguna red: cambiando esos valores funciona en Sepolia o en mainnet.
 
-### Correrlo
+### Correrlo (local)
 
 ```bash
 python app.py
 ```
 
 Abre `http://127.0.0.1:5000` en tu navegador.
+
+### Compartirlo por internet (pruebas)
+
+Para que otras personas lo usen, se corre con **Waitress** (servidor de producción, en lugar del servidor de desarrollo de Flask) escuchando solo en tu máquina, y se expone con un túnel HTTPS de Cloudflare:
+
+```bash
+# Terminal 1: el dashboard
+python -m waitress --listen=127.0.0.1:5000 app:app
+
+# Terminal 2: el túnel (te da una URL https://....trycloudflare.com)
+cloudflared tunnel --url http://127.0.0.1:5000
+```
+
+La URL del túnel cambia cada vez que lo arrancas. En celular, la página se abre desde el navegador integrado de la app de MetaMask.
 
 ## Estructura
 
@@ -100,7 +114,8 @@ moneda/
 ├── templates/index.html
 ├── static/
 │   ├── style.css
-│   └── wallet.js         # Conectar wallet, enviar y comprar (ethers.js)
+│   ├── wallet.js         # Conectar wallet, enviar y comprar (ethers.js)
+│   └── vendor/ethers-6.13.4.umd.min.js
 ├── docs/dashboard-screenshot.png
 ├── requirements.txt
 ├── .env.example
@@ -111,6 +126,8 @@ moneda/
 
 - El backend Flask es **solo de lectura**: no pide ni maneja llaves privadas.
 - "Conectar Wallet" corre 100% en el navegador del usuario (JavaScript + MetaMask). Cada quien firma sus propias transacciones.
+- `ethers.js` se sirve desde `static/vendor/` (no desde un CDN externo).
+- El servidor agrega cabeceras de seguridad (`X-Frame-Options: DENY` contra clickjacking, `nosniff`) y no muestra errores internos al visitante.
 - El `.env` está en `.gitignore` a propósito.
 
 ## Próximos pasos posibles
